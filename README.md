@@ -12,6 +12,7 @@ you need to create a config.json like so
 {
     "githubAuth": "personal access token with repo:status perms",
     "jenkinsAuth": "youruser:yourapikey",
+    "jenkinsProject": "name of jenkins project",
     "repoOwner": "org name",
     "repoName": "repo name",
     "listenPort": 8080,

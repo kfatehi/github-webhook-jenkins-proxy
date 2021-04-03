@@ -21,33 +21,78 @@ const proxy = httpProxy.createProxyServer({});
 const proxyApp = express();
 proxyApp.use(bodyParser.json());
 
-proxyApp.use(function(req, res){
+function shouldTest(githubEvent, {pull_request, comment}) {
+    return (
+        // it's a new pull request
+        githubEvent == "pull_request"
+        ||
+        // it's a push to an existing pull request
+        (githubEvent == "push" && req.body.pull_request)
+        ||
+        // it's a comment on a pull request saying to test it
+        // in this case we need to fetch the sha
+        ( 
+            githubEvent == "issue_comment"
+            && req.body.pull_request
+            && /test this/.test(comment.body)
+        )
+    )
+}
+
+async function queueBuild(commitSha) {
+    console.log('queue build for sha', commitSha)
+    return new Promise((resolve, reject)=>{
+        jenkins.job.build({
+            name: config.jenkinsProject,
+            parameters: {
+                BRANCH_SPECIFIER: commitSha
+            }
+        }, function(err, jenkinsItemNumber) {
+            if (err) return reject(err);
+            q.add({ jenkinsItemNumber, commitSha });
+            resolve();
+        });
+    });
+}
+
+proxyApp.use(async function(req, res){
     let githubEvent = req.headers['x-github-event'];
-    if (githubEvent == undefined) { 
-        // it's a request meant for jenkins web ui, forward it
-        proxy.web(req, res, { target: 'http://localhost:'+config.jenkinsPort }, function(err) {
+
+    if (!githubEvent) { 
+        return proxy.web(req, res, {
+            target: 'http://localhost:'+config.jenkinsPort
+        }, function(err) {
             console.log("proxy error", err.message);
         });
-    } else if (githubEvent == "pull_request") {
-        jenkins.job.build({
-            name: 'bpd-web',
-            parameters: {
-                BRANCH_SPECIFIER: req.body.pull_request.head.sha
-            }
-        }, function(err, data) {
-            if (err) throw err;
-            console.log('queue item number', data);
-            q.add({
-                jenkinsItemNumber: data,
-                commitSha: req.body.pull_request.head.sha
-            });
-            res.writeHead(201);
-            res.end();
-        });
+    }
+
+    if (githubEvent == "pull_request" && req.body.action == "synchronize") {
+        console.log('handling pull request synchronize by building');
+        await queueBuild(req.body.pull_request.head.sha);
+        return res.status(201).end();
+    } else if (githubEvent == "pull_request" && req.body.action == "opened") {
+        console.log('handling pull request open by building');
+        await queueBuild(req.body.pull_request.head.sha);
+        return res.status(201).end();
+    } else if (githubEvent == "pull_request" && req.body.action == "closed") {
+        console.log('handling pull request closed by doing nothing');
+        return res.status(200).end();
+    } else if (githubEvent == "issue_comment" && req.body.action == "deleted") {
+        console.log('handling issue commend deletion by doing nothing');
+        return res.status(200).end();
+    } else if (githubEvent == "issue_comment" && req.body.action == "created" && req.body.issue.pull_request && /test this/.test(req.body.comment.body)) {
+        // example webhook is f7364e80-9409-11eb-83a9-7fa4f80f27bb
+        console.log('handling PR comment containing "test this" by building after fetching PR ', req.body.issue.number);
+        let pull = await octokit.request('GET /repos/{owner}/{repo}/pulls/{pull_number}', {
+            owner: config.repoOwner,
+            repo: config.repoName,
+            pull_number: req.body.issue.number
+        })
+        await queueBuild(pull.data.head.sha);
+        return res.status(200).end();
     } else {
-        console.log("UNIMPLEMENTED GITHUB EVENT", githubEvent);
-        res.writeHead(500);
-        res.end();
+        console.log("ignoring unimplemented github event", githubEvent, 'delivery id', req.headers['x-github-delivery']);
+        return res.status(400).end();
     }
 });
 

@@ -66,23 +66,10 @@ proxyApp.use(async function(req, res){
         });
     }
 
-    if (githubEvent == "pull_request" && req.body.action == "synchronize") {
-        console.log('handling pull request synchronize by building');
+    if (githubEvent == "pull_request" && ( req.body.action == "synchronize" || req.body.action == "opened" )) {
         await queueBuild(req.body.pull_request.head.sha);
         return res.status(201).end();
-    } else if (githubEvent == "pull_request" && req.body.action == "opened") {
-        console.log('handling pull request open by building');
-        await queueBuild(req.body.pull_request.head.sha);
-        return res.status(201).end();
-    } else if (githubEvent == "pull_request" && req.body.action == "closed") {
-        console.log('handling pull request closed by doing nothing');
-        return res.status(200).end();
-    } else if (githubEvent == "issue_comment" && req.body.action == "deleted") {
-        console.log('handling issue commend deletion by doing nothing');
-        return res.status(200).end();
-    } else if (githubEvent == "issue_comment" && req.body.action == "created" && req.body.issue.pull_request && /test this/.test(req.body.comment.body)) {
-        // example webhook is f7364e80-9409-11eb-83a9-7fa4f80f27bb
-        console.log('handling PR comment containing "test this" by building after fetching PR ', req.body.issue.number);
+    } else if (githubEvent == "issue_comment" && req.body.action == "created" && req.body.issue.pull_request && req.body.comment.body.includes(config.triggerPhrase)) {
         let pull = await octokit.request('GET /repos/{owner}/{repo}/pulls/{pull_number}', {
             owner: config.repoOwner,
             repo: config.repoName,
@@ -91,7 +78,7 @@ proxyApp.use(async function(req, res){
         await queueBuild(pull.data.head.sha);
         return res.status(200).end();
     } else {
-        console.log("ignoring unimplemented github event", githubEvent, 'delivery id', req.headers['x-github-delivery']);
+        console.log("ignoring irrelevant webook delivery", req.headers['x-github-delivery']);
         return res.status(400).end();
     }
 });

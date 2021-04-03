@@ -2,8 +2,8 @@ const http = require('http');
 const express = require('express');
 const bodyParser = require('body-parser');
 const httpProxy = require('http-proxy');
-var Queue = require('node-persistent-queue') ;
-var q = new Queue('./db/status_reporter.sqlite', 1) ;
+var Queue = require('node-persistent-queue');
+var q = new Queue('./db/status_reporter.sqlite', 1);
 const { Octokit } = require("@octokit/rest");
 const config = require('./config.json')
 
@@ -20,24 +20,6 @@ const jenkins = require('jenkins')({
 const proxy = httpProxy.createProxyServer({});
 const proxyApp = express();
 proxyApp.use(bodyParser.json());
-
-function shouldTest(githubEvent, {pull_request, comment}) {
-    return (
-        // it's a new pull request
-        githubEvent == "pull_request"
-        ||
-        // it's a push to an existing pull request
-        (githubEvent == "push" && req.body.pull_request)
-        ||
-        // it's a comment on a pull request saying to test it
-        // in this case we need to fetch the sha
-        ( 
-            githubEvent == "issue_comment"
-            && req.body.pull_request
-            && /test this/.test(comment.body)
-        )
-    )
-}
 
 async function queueBuild(commitSha) {
     console.log('queue build for sha', commitSha)
@@ -85,12 +67,12 @@ proxyApp.use(async function(req, res){
 
 q.on('open',() => {
     console.log('Opening SQLite DB') ;
-    console.log('Queue contains '+q.getLength()+' job/s') ;
+    console.log('Queue contains '+q.getLength()+' job/s');
 }) ;
  
 q.on('add',task => {
-    console.log('Adding task: '+JSON.stringify(task)) ;
-    console.log('Queue contains '+q.getLength()+' job/s') ;
+    console.log('Adding task: '+JSON.stringify(task));
+    console.log('Queue contains '+q.getLength()+' job/s');
 }) ;
  
 q.on('start',() => {
@@ -105,9 +87,9 @@ const reschedule = (task, extraData={}, retryIn=5000)=> {
     }, retryIn); 
 }
 q.on('next',task => {
-    console.log('Queue contains '+q.getLength()+' job/s') ;
-    console.log('Process task: ') ;
-    console.log(JSON.stringify(task)) ;
+    console.log('Queue contains '+q.getLength()+' job/s');
+    console.log('Process task: ');
+    console.log(JSON.stringify(task));
 
     if (!task.job.jenkinsBuildId) {
         return jenkins.queue.item( task.job.jenkinsItemNumber,  function(err, data) {
@@ -188,15 +170,12 @@ q.on('close',() => {
     console.log('Closing SQLite DB') ;
 });
 
-q.open()
-.then(() => {
+q.open().then(() => {
     q.start();
-})
-.catch(err => {
+}).catch(err => {
     console.log('Error occurred:') ;
     console.log(err.stack);
-    process.exit(1);
-}) ;
+});
 
 http.createServer(proxyApp).listen(config.listenPort, '0.0.0.0', () => {
 	console.log('Proxy server listening on '+config.listenPort);

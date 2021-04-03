@@ -15,6 +15,7 @@ you need to create a config.json like so
     "jenkinsProject": "name of jenkins project",
     "repoOwner": "org name",
     "repoName": "repo name",
+    "triggerPhrase": "a phrase to check for in pr comments to trigger a build",
     "listenPort": 8080,
     "jenkinsPort": 8081
 }

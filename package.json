@@ -1,0 +1,24 @@
+{
+  "name": "angryproxy",
+  "version": "1.0.0",
+  "description": "ghpr is broken on dangly PRs like this one https://github.com/BigPurpleDot/BigPurpleDot/pull/10793 to bypass ghpr let us intercept incoming webhook and create the job in jenkins ourself of course the point is to publish status check, so we do all that too",
+  "main": "app.js",
+  "dependencies": {
+    "@octokit/rest": "^18.5.2",
+    "body-parser": "^1.19.0",
+    "express": "^4.17.1",
+    "http-proxy": "^1.18.1",
+    "jenkins": "^0.28.1",
+    "jenkins-api": "^0.3.1",
+    "node-dev": "^6.6.0",
+    "node-http-proxy": "^0.2.4",
+    "node-persistent-queue": "^1.0.3"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

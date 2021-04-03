@@ -10,7 +10,7 @@ you need to create a config.json like so
 
 ```json
 {
-    "githubAuth": "personal access token with repo:status perms",
+    "githubAuth": "personal access token with full 'repo' scope",
     "jenkinsAuth": "youruser:yourapikey",
     "jenkinsProject": "name of jenkins project",
     "repoOwner": "org name",

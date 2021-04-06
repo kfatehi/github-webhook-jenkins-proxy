@@ -71,13 +71,12 @@ q.on('open',() => {
 }) ;
  
 q.on('add',task => {
-    console.log('Adding task: '+JSON.stringify(task));
-    console.log('Queue contains '+q.getLength()+' job/s');
+    console.log('Adding task ('+q.getLength()+' total) '+JSON.stringify(task));
 }) ;
  
 q.on('start',() => {
-    console.log('Starting queue') ;
-}) ;
+    console.log('Started queue') ;
+});
  
 // "blocks" for 5 seconds before calling done (so we are more crash-resistant) and adds to queue
 const reschedule = (task, extraData={}, retryIn=5000)=> {
@@ -87,9 +86,7 @@ const reschedule = (task, extraData={}, retryIn=5000)=> {
     }, retryIn); 
 }
 q.on('next',task => {
-    console.log('Queue contains '+q.getLength()+' job/s');
-    console.log('Process task: ');
-    console.log(JSON.stringify(task));
+    console.log('Process task ('+q.getLength()+' total) '+JSON.stringify(task));
 
     if (!task.job.jenkinsBuildId) {
         return jenkins.queue.item( task.job.jenkinsItemNumber,  function(err, data) {
@@ -100,7 +97,27 @@ q.on('next',task => {
                     jenkinsBuildId: data.executable.number,
                     jenkinsBuildUrl: data.executable.url.replace('b1to1p1to1d.hopto.org', '10.244.187.148')
                 }, 5000);
+            } else if (data.blocked) {
+                if (!task.job.reportedBlockedState) {
+                    octokit.request('POST /repos/{owner}/{repo}/statuses/{sha}', {
+                        owner: config.repoOwner,
+                        repo: config.repoName,
+                        sha: task.job.commitSha,
+                        state: 'pending',
+                        description: "Build is waiting in the queue",
+                    }).then(()=>{
+                        console.log("marked job as blocked");
+                        return reschedule(task, { reportedBlockedState: true });
+                    }).catch(err=>{
+                        console.log(err.stack)
+                        return reschedule(task, 1000);
+                    })
+                } else {
+                    return reschedule(task, 1000);
+                }
             } else {
+                console.log("There is some other issue with this, read the output and handle it")
+                console.log(data);
                 return reschedule(task, 1000);
             }
         })
@@ -109,9 +126,7 @@ q.on('next',task => {
     jenkins.build.get('bpd-web', task.job.jenkinsBuildId, function(err, data) {
         if (err) throw err;
 
-        console.log(task.job);
-        
-        if (data.result == "FAILURE") {               
+        if (data.result == "FAILURE" || data.result == "ABORTED") {               
             return octokit.request('POST /repos/{owner}/{repo}/statuses/{sha}', {
                 owner: config.repoOwner,
                 repo: config.repoName,

@@ -50,7 +50,7 @@ proxyApp.use(async function(req, res){
 
     if (githubEvent == "pull_request" && ( req.body.action == "synchronize" || req.body.action == "opened" )) {
         await queueBuild(req.body.pull_request.head.sha);
-        return res.status(201).end();
+        return res.status(201).end("thanks for the contribution, i will build it");
     } else if (githubEvent == "issue_comment" && req.body.action == "created" && req.body.issue.pull_request && req.body.comment.body.includes(config.triggerPhrase)) {
         let pull = await octokit.request('GET /repos/{owner}/{repo}/pulls/{pull_number}', {
             owner: config.repoOwner,
@@ -58,10 +58,10 @@ proxyApp.use(async function(req, res){
             pull_number: req.body.issue.number
         })
         await queueBuild(pull.data.head.sha);
-        return res.status(200).end();
+        return res.status(201).end("thanks for the issue comment, i will test it");
     } else {
         console.log("ignoring irrelevant webook delivery", req.headers['x-github-delivery']);
-        return res.status(400).end();
+        return res.status(202).end("irrelevant webhook, ignoring");
     }
 });
 
@@ -95,7 +95,7 @@ q.on('next',task => {
             if (data.executable) {
                 return reschedule(task, {
                     jenkinsBuildId: data.executable.number,
-                    jenkinsBuildUrl: data.executable.url.replace('b1to1p1to1d.hopto.org', '10.244.187.148')
+                    jenkinsBuildUrl: data.executable.url.replace('b1to1p1to1d.hopto.org', '10.170.148.199')
                 }, 5000);
             } else if (data.blocked) {
                 if (!task.job.reportedBlockedState) {
@@ -115,6 +115,9 @@ q.on('next',task => {
                 } else {
                     return reschedule(task, 1000);
                 }
+            } else if (data.cancelled) {
+                console.log("job canceled from jenkins ui");
+                return;
             } else {
                 console.log("There is some other issue with this, read the output and handle it")
                 console.log(data);

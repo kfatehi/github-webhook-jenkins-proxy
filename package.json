@@ -12,7 +12,8 @@
     "jenkins-api": "^0.3.1",
     "node-dev": "^6.6.0",
     "node-http-proxy": "^0.2.4",
-    "node-persistent-queue": "^1.0.3"
+    "node-persistent-queue": "^1.0.3",
+    "public-ip": "^4.0.3"
   },
   "devDependencies": {},
   "scripts": {

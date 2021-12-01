@@ -24,3 +24,11 @@ you need to create a config.json like so
 then run it
 
 `node webhook_interceptor.js`
+
+## periodic builds
+
+There is an endpoint that you can use in a loop like this to hammer your jenkins with builds using a commit hash:
+
+```
+while true; curl localhost:8080/build/3e5c62be177a2ca1489f383ee258031ee458c3fa; do sleep 1400; done;
+```

@@ -19,7 +19,7 @@ const jenkins = require('jenkins')({
 
 const proxy = httpProxy.createProxyServer({});
 const proxyApp = express();
-proxyApp.use(bodyParser.json());
+proxyApp.use(bodyParser.json({ limit: "50mb" }));
 
 async function queueBuild(commitSha) {
     console.log('queue build for sha', commitSha)
@@ -36,6 +36,18 @@ async function queueBuild(commitSha) {
         });
     });
 }
+
+// This route is useful for submitting a build every so often...
+// e.g.: build @ this commit every 20 mins:
+// while true; curl localhost:8080/build/f7e4795dcbe97a6bf2c36c986184fe7de73af3b0; do sleep 1440; done;
+proxyApp.get('/build/:commit', async (req, res, next)=>{
+    try {
+        await queueBuild(req.params.commit)
+        res.send("ok")
+    } catch(err) {
+        next(err);
+    }
+})
 
 proxyApp.use(async function(req, res){
     let githubEvent = req.headers['x-github-event'];
@@ -90,7 +102,10 @@ q.on('next',task => {
 
     if (!task.job.jenkinsBuildId) {
         return jenkins.queue.item( task.job.jenkinsItemNumber,  function(err, data) {
-            if (err) throw err;
+            if (err) {
+                console.error(err.message);
+                return;
+            }
     
             if (data.executable) {
                 return reschedule(task, {

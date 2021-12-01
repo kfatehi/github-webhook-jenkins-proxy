@@ -142,7 +142,12 @@ q.on('next',task => {
     }
 
     jenkins.build.get('bpd-web', task.job.jenkinsBuildId, function(err, data) {
-        if (err) throw err;
+        if (err) {
+          console.error(err.stack)
+          q.done();
+          console.log("Marking as done due to error");
+          return;
+        }
 
         if (data.result == "FAILURE" || data.result == "ABORTED") {               
             return octokit.request('POST /repos/{owner}/{repo}/statuses/{sha}', {

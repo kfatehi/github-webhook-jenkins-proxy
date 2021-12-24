@@ -17,7 +17,8 @@ you need to create a config.json like so
     "repoName": "repo name",
     "triggerPhrase": "a phrase to check for in pr comments to trigger a build",
     "listenPort": 8080,
-    "jenkinsPort": 8081
+    "jenkinsPort": 8081,
+    "slackAlertEndpoint": "https://hooks.slack.com/services/..."
 }
 ```
 

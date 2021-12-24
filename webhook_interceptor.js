@@ -6,6 +6,7 @@ var Queue = require('node-persistent-queue');
 var q = new Queue('./db/status_reporter.sqlite', 1);
 const { Octokit } = require("@octokit/rest");
 const config = require('./config.json')
+const axios = require('axios')
 
 const octokit = new Octokit({
     auth: config.githubAuth,
@@ -43,7 +44,7 @@ async function queueBuild(commitSha) {
 proxyApp.get('/build/:commit', async (req, res, next)=>{
     try {
         await queueBuild(req.params.commit)
-        res.send("ok")
+        res.send("queued\n")
     } catch(err) {
         next(err);
     }
@@ -162,6 +163,9 @@ q.on('next',task => {
                 target_url: task.job.jenkinsBuildUrl
             }).then(()=>{
                 console.log("marked job as failure");
+                axios.post(config.slackAlertEndpoint, {
+                  text: `Build failed: ${task.job.jenkinsBuildUrl}`
+                });
                 q.done();
             }).catch(err=>{
                 console.log(err.stack)
@@ -177,6 +181,9 @@ q.on('next',task => {
                 target_url: task.job.jenkinsBuildUrl
             }).then(()=>{
                 console.log("marked job as success");
+                axios.post(config.slackAlertEndpoint, {
+                  text: `Build succeeded: ${task.job.jenkinsBuildUrl}`
+                });
                 q.done();
             }).catch(err=>{
                 console.log(err.stack)
@@ -192,6 +199,9 @@ q.on('next',task => {
                 target_url: task.job.jenkinsBuildUrl
             }).then(()=>{
                 console.log("marked job as pending");
+                axios.post(config.slackAlertEndpoint, {
+                  text: `Build pending: ${task.job.jenkinsBuildUrl}`
+                });
                 return reschedule(task, { reportedPendingState: true });
             }).catch(err=>{
                 console.log(err.stack)

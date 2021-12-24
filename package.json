@@ -5,6 +5,7 @@
   "main": "app.js",
   "dependencies": {
     "@octokit/rest": "^18.5.2",
+    "axios": "^0.24.0",
     "body-parser": "^1.19.0",
     "express": "^4.17.1",
     "http-proxy": "^1.18.1",
@@ -15,7 +16,6 @@
     "node-persistent-queue": "^1.0.3",
     "public-ip": "^4.0.3"
   },
-  "devDependencies": {},
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },

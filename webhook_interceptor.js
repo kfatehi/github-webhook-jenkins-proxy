@@ -22,13 +22,13 @@ const proxy = httpProxy.createProxyServer({});
 const proxyApp = express();
 proxyApp.use(bodyParser.json({ limit: "50mb" }));
 
-async function queueBuild(commitSha) {
+async function queueBuild(commitSha, branchSpecificerOverride) {
     console.log('queue build for sha', commitSha)
     return new Promise((resolve, reject)=>{
         jenkins.job.build({
             name: config.jenkinsProject,
             parameters: {
-                BRANCH_SPECIFIER: commitSha
+                BRANCH_SPECIFIER: branchSpecificerOverride || commitSha
             }
         }, function(err, jenkinsItemNumber) {
             if (err) return reject(err);
@@ -65,7 +65,7 @@ proxyApp.use(async function(req, res){
         await queueBuild(req.body.pull_request.head.sha);
         return res.status(201).end("thanks for the PR, i will build it");
     } else if (githubEvent == "push" && req.body.ref === "refs/heads/master") {
-        await queueBuild(req.body.head_commit.id);
+        await queueBuild(req.body.head_commit.id, "master");
         return res.status(201).end("thanks for the push, i will build it");
     } else if (githubEvent == "issue_comment" && req.body.action == "created" && req.body.issue.pull_request && req.body.comment.body.includes(config.triggerPhrase)) {
         let pull = await octokit.request('GET /repos/{owner}/{repo}/pulls/{pull_number}', {

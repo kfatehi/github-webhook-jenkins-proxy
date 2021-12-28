@@ -7,6 +7,7 @@ var q = new Queue('./db/status_reporter.sqlite', 1);
 const { Octokit } = require("@octokit/rest");
 const config = require('./config.json')
 const axios = require('axios')
+const hooks = require('./hooks');
 
 const octokit = new Octokit({
     auth: config.githubAuth,
@@ -64,9 +65,17 @@ proxyApp.use(async function(req, res){
     if (githubEvent == "pull_request" && ( req.body.action == "synchronize" || req.body.action == "opened" )) {
         await queueBuild(req.body.pull_request.head.sha);
         return res.status(201).end("thanks for the PR, i will build it");
-    } else if (githubEvent == "push" && req.body.ref === "refs/heads/master") {
-        await queueBuild(req.body.head_commit.id, "master");
-        return res.status(201).end("thanks for the push, i will build it");
+    } else if (githubEvent == "push" && config.refHooks && config.refHooks[req.body.ref]) {
+        let hookDefinitions = config.refHooks[req.body.ref];
+        if (hookDefinitions.branch) {
+          await queueBuild(req.body.head_commit.id, branch);
+        }
+        if (hookDefinitions.exec) {
+          console.log("Executing hook...");
+          const {stdout, stderr} = await hooks.exec(hookDefinitions.exec.command);
+          console.log({ stdout, stderr });
+        }
+        return res.status(201).end("thanks for the push. hooks have executed.");
     } else if (githubEvent == "issue_comment" && req.body.action == "created" && req.body.issue.pull_request && req.body.comment.body.includes(config.triggerPhrase)) {
         let pull = await octokit.request('GET /repos/{owner}/{repo}/pulls/{pull_number}', {
             owner: config.repoOwner,

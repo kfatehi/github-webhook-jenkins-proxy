@@ -22,6 +22,22 @@ you need to create a config.json like so
 }
 ```
 
+The slack is optional. There is also this concept of hooks that can be used to change behavior depending on the ref on a push event. For example:
+
+```
+  "refHooks": {
+    "refs/heads/foo": {
+      "buildBranch": "foo",
+    },
+    "refs/heads/master": {
+      "buildBranch": false,
+      "exec": {
+        "command": "cd /repo && some crazy merge push automation"
+      }
+    }
+  }
+```
+
 then run it
 
 `node webhook_interceptor.js`

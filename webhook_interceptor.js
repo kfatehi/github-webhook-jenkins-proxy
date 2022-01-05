@@ -8,6 +8,7 @@ const { Octokit } = require("@octokit/rest");
 const config = require('./config.json')
 const axios = require('axios')
 const hooks = require('./hooks');
+const { response } = require('express');
 
 const octokit = new Octokit({
     auth: config.githubAuth,
@@ -23,7 +24,7 @@ const proxy = httpProxy.createProxyServer({});
 const proxyApp = express();
 proxyApp.use(bodyParser.json({ limit: "50mb" }));
 
-async function queueBuild(commitSha, branchSpecificerOverride) {
+async function queueBuild(commitSha, branchSpecificerOverride, sender) {
     console.log('queue build for sha', commitSha)
     return new Promise((resolve, reject)=>{
         jenkins.job.build({
@@ -33,7 +34,7 @@ async function queueBuild(commitSha, branchSpecificerOverride) {
             }
         }, function(err, jenkinsItemNumber) {
             if (err) return reject(err);
-            q.add({ jenkinsItemNumber, commitSha });
+            q.add({ jenkinsItemNumber, commitSha, sender });
             resolve();
         });
     });
@@ -63,12 +64,12 @@ proxyApp.use(async function(req, res){
     }
 
     if (githubEvent == "pull_request" && ( req.body.action == "synchronize" || req.body.action == "opened" )) {
-        await queueBuild(req.body.pull_request.head.sha);
+        await queueBuild(req.body.pull_request.head.sha, null, req.body.sender);
         return res.status(201).end("thanks for the PR, i will build it");
     } else if (githubEvent == "push" && config.refHooks && config.refHooks[req.body.ref]) {
         let hookDefinitions = config.refHooks[req.body.ref];
         if (hookDefinitions.branch) {
-          await queueBuild(req.body.head_commit.id, branch);
+          await queueBuild(req.body.head_commit.id, branch, req.body.sender);
         }
         if (hookDefinitions.exec) {
           console.log("Executing hook...");
@@ -82,7 +83,7 @@ proxyApp.use(async function(req, res){
             repo: config.repoName,
             pull_number: req.body.issue.number
         })
-        await queueBuild(pull.data.head.sha);
+        await queueBuild(pull.data.head.sha, null, req.body.sender);
         return res.status(201).end("thanks for the issue comment, i will test it");
     } else {
         console.log("ignoring irrelevant webook delivery", req.headers['x-github-delivery']);
@@ -153,7 +154,7 @@ q.on('next',task => {
             }
         })
     }
-
+    // slack api for attachment: https://api.slack.com/reference/messaging/attachments
     jenkins.build.get('bpd-web', task.job.jenkinsBuildId, function(err, data) {
         if (err) {
           console.error(err.stack)
@@ -170,11 +171,11 @@ q.on('next',task => {
                 state: 'failure',
                 description: "Build has failed",
                 target_url: task.job.jenkinsBuildUrl
-            }).then(()=>{
+            }).then((res)=>{
                 console.log("marked job as failure");
-                axios.post(config.slackAlertEndpoint, {
-                  text: `Build failed: ${task.job.jenkinsBuildUrl}`
-                });
+                axios.post(config.slackAlertEndpoint, slackNotify(
+                    "Failed", task.job, "#ff0000"
+                ));
                 q.done();
             }).catch(err=>{
                 console.log(err.stack)
@@ -188,11 +189,12 @@ q.on('next',task => {
                 state: 'success',
                 description: "Build succeeded",
                 target_url: task.job.jenkinsBuildUrl
-            }).then(()=>{
+            }).then((res)=>{
                 console.log("marked job as success");
-                axios.post(config.slackAlertEndpoint, {
-                  text: `Build succeeded: ${task.job.jenkinsBuildUrl}`
-                });
+                console.log("success - github response: ", res);
+                axios.post(config.slackAlertEndpoint, slackNotify(
+                    "Succeeded", task.job, "#36a64f"
+                ));
                 q.done();
             }).catch(err=>{
                 console.log(err.stack)
@@ -206,11 +208,11 @@ q.on('next',task => {
                 state: 'pending',
                 description: "Build is pending",
                 target_url: task.job.jenkinsBuildUrl
-            }).then(()=>{
+            }).then((res)=>{
                 console.log("marked job as pending");
-                axios.post(config.slackAlertEndpoint, {
-                  text: `Build pending: ${task.job.jenkinsBuildUrl}`
-                });
+                axios.post(config.slackAlertEndpoint, slackNotify(
+                    "Pending", task.job, ""
+                ));
                 return reschedule(task, { reportedPendingState: true });
             }).catch(err=>{
                 console.log(err.stack)
@@ -240,3 +242,19 @@ q.open().then(() => {
 http.createServer(proxyApp).listen(config.listenPort, '0.0.0.0', () => {
 	console.log('Proxy server listening on '+config.listenPort);
 });
+
+function slackNotify(status, { jenkinsBuildUrl, sender: {login, avatar_url} }, color){
+    return { "attachments": [
+            {
+                "mrkdwn_in": ["text"],
+                "color": color,
+                "author_name": login,
+                "author_icon": avatar_url,
+                "title": `[Jenkins] Build ${status}`,
+                "title_link": jenkinsBuildUrl,
+                "footer": "jenkins",
+                "footer_icon": "https://www.jenkins.io/images/logos/cowboy/cowboy.png"
+            }
+        ]
+    }
+}

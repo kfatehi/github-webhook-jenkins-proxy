@@ -171,7 +171,7 @@ q.on('next',task => {
                 state: 'failure',
                 description: "Build has failed",
                 target_url: task.job.jenkinsBuildUrl
-            }).then((res)=>{
+            }).then(()=>{
                 console.log("marked job as failure");
                 axios.post(config.slackAlertEndpoint, slackNotify(
                     "Failed", task.job, "#ff0000"
@@ -189,9 +189,8 @@ q.on('next',task => {
                 state: 'success',
                 description: "Build succeeded",
                 target_url: task.job.jenkinsBuildUrl
-            }).then((res)=>{
+            }).then(()=>{
                 console.log("marked job as success");
-                console.log("success - github response: ", res);
                 axios.post(config.slackAlertEndpoint, slackNotify(
                     "Succeeded", task.job, "#36a64f"
                 ));
@@ -208,7 +207,7 @@ q.on('next',task => {
                 state: 'pending',
                 description: "Build is pending",
                 target_url: task.job.jenkinsBuildUrl
-            }).then((res)=>{
+            }).then(()=>{
                 console.log("marked job as pending");
                 axios.post(config.slackAlertEndpoint, slackNotify(
                     "Pending", task.job, ""

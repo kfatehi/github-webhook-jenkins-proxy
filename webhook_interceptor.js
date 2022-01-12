@@ -73,8 +73,13 @@ proxyApp.use(async function(req, res){
         }
         if (hookDefinitions.exec) {
           console.log("Executing hook...");
-          const {stdout, stderr} = await hooks.exec(hookDefinitions.exec.command);
-          console.log({ stdout, stderr });
+          try {
+            const {stdout, stderr} = await hooks.exec(hookDefinitions.exec.command);
+            console.log({ stdout, stderr });
+          } catch(err) {
+            console.error("error with exec", err.stack);
+            axios.post(config.slackAlertEndpoint, slackNotifyHookError(req.body.sender));
+          }
         }
         return res.status(201).end("thanks for the push. hooks have executed.");
     } else if (githubEvent == "issue_comment" && req.body.action == "created" && req.body.issue.pull_request && req.body.comment.body.includes(config.triggerPhrase)) {
@@ -106,6 +111,7 @@ q.on('start',() => {
  
 // "blocks" for 5 seconds before calling done (so we are more crash-resistant) and adds to queue
 const reschedule = (task, extraData={}, retryIn=5000)=> {
+    console.log("reschedule the block again");
     setTimeout(()=>{
         q.done();
         q.add(Object.assign({}, task.job, extraData))
@@ -117,7 +123,8 @@ q.on('next',task => {
     if (!task.job.jenkinsBuildId) {
         return jenkins.queue.item( task.job.jenkinsItemNumber,  function(err, data) {
             if (err) {
-                console.error(err.message);
+                console.error("Error on job build"+ err.message);
+                q.done();
                 return;
             }
     
@@ -251,6 +258,21 @@ function slackNotify(status, { jenkinsBuildUrl, sender: {login, avatar_url} }, c
                 "author_icon": avatar_url,
                 "title": `[Jenkins] Build ${status}`,
                 "title_link": jenkinsBuildUrl,
+                "footer": "jenkins",
+                "footer_icon": "https://www.jenkins.io/images/logos/cowboy/cowboy.png"
+            }
+        ]
+    }
+}
+
+function slackNotifyHookError({login, avatar_url}){
+    return { "attachments": [
+            {
+                "mrkdwn_in": ["text"],
+                "color": "#ff0000",
+                "author_name": login,
+                "author_icon": avatar_url,
+                "title": `[Jenkins] Hook Error`,
                 "footer": "jenkins",
                 "footer_icon": "https://www.jenkins.io/images/logos/cowboy/cowboy.png"
             }

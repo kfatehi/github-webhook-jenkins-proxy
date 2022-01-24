@@ -78,7 +78,7 @@ proxyApp.use(async function(req, res){
             console.log({ stdout, stderr });
           } catch(err) {
             console.error("error with exec", err.stack);
-            axios.post(config.slackAlertEndpoint, slackNotifyHookError(req.body.sender));
+            axios.post(config.slackAlertEndpoint, slackNotifyHookError(req.body.sender, err, stderr));
           }
         }
         return res.status(201).end("thanks for the push. hooks have executed.");
@@ -258,6 +258,7 @@ function slackNotify(status, { jenkinsBuildUrl, sender: {login, avatar_url} }, c
                 "author_icon": avatar_url,
                 "title": `[Jenkins] Build ${status}`,
                 "title_link": jenkinsBuildUrl,
+                "text": `${githubNameToSlackName(login)} build ${status}`,
                 "footer": "jenkins",
                 "footer_icon": "https://www.jenkins.io/images/logos/cowboy/cowboy.png"
             }
@@ -265,7 +266,7 @@ function slackNotify(status, { jenkinsBuildUrl, sender: {login, avatar_url} }, c
     }
 }
 
-function slackNotifyHookError({login, avatar_url}){
+function slackNotifyHookError({login, avatar_url}, err, stderr){
     return { "attachments": [
             {
                 "mrkdwn_in": ["text"],
@@ -273,9 +274,19 @@ function slackNotifyHookError({login, avatar_url}){
                 "author_name": login,
                 "author_icon": avatar_url,
                 "title": `[Jenkins] Hook Error`,
+                "text": `${githubNameToSlackName(login)} ${err.message} ${err.stack} ${stderr}`,
                 "footer": "jenkins",
                 "footer_icon": "https://www.jenkins.io/images/logos/cowboy/cowboy.png"
             }
         ]
     }
+}
+
+function githubNameToSlackName(name) {
+  if (config && config.githubAccountSlackMemberMap) {
+    let slackref = config.githubAccountSlackMemberMap[name];
+    if (slackref)
+      return slackref;
+  }
+  return name;
 }

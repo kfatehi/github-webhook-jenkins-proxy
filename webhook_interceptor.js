@@ -85,7 +85,7 @@ proxyApp.use(async function(req, res){
             }
           } catch(err) {
             console.error("error with exec", err.stack);
-            axios.post(config.slackAlertEndpoint, slackNotifyHookError(req.body.sender, err, stderr));
+            axios.post(config.slackAlertEndpoint, slackNotifyHookError(req.body.sender, err, stdout, stderr));
           }
         }
         return res.status(201).end("thanks for the push. hooks have executed.");
@@ -273,20 +273,38 @@ function slackNotify(status, { jenkinsBuildUrl, sender: {login, avatar_url} }, c
     }
 }
 
-function slackNotifyHookError({login, avatar_url}, err, stderr){
-    return { "attachments": [
-            {
-                "mrkdwn_in": ["text"],
-                "color": "#ff0000",
-                "author_name": login,
-                "author_icon": avatar_url,
-                "title": `[Jenkins] Hook Error`,
-                "text": `${githubNameToSlackName(login)} ${err.message} ${err.stack} ${stderr}`,
-                "footer": "jenkins",
-                "footer_icon": "https://www.jenkins.io/images/logos/cowboy/cowboy.png"
-            }
-        ]
+function slackNotifyHookError({login, avatar_url}, err, stdout, stderr){
+  let attachments = [
+    {
+      "mrkdwn_in": ["text"],
+      "color": "#ff0000",
+      "author_name": login,
+      "author_icon": avatar_url,
+      "title": `[Jenkins] Hook Error`,
+      "text": `${githubNameToSlackName(login)} Hook Error`,
+      "footer": "jenkins",
+      "footer_icon": "https://www.jenkins.io/images/logos/cowboy/cowboy.png"
     }
+  ];
+  if (err && err.stack && err.stack.length) {
+    attachments.push({
+      "title": `Stack Trace`,
+      "text": err.stack
+    })
+  }
+  if (stdout && stdout.length) {
+    attachments.push({
+      "title": "Standard output",
+      "text": stdout
+    })
+  }
+  if (stderr && stderr.length) {
+    attachments.push({
+      "title": "Standard error",
+      "text": stderr
+    })
+  }
+  return { attachments }
 }
 
 function githubNameToSlackName(name) {

@@ -73,9 +73,16 @@ proxyApp.use(async function(req, res){
         }
         if (hookDefinitions.exec) {
           console.log("Executing hook...");
+          let stdout = ""
+          let stderr = ""
           try {
-            const {stdout, stderr} = await hooks.exec(hookDefinitions.exec.command);
-            console.log({ stdout, stderr });
+            const out = await hooks.exec(hookDefinitions.exec.command);
+            if (out && out.stdout) {
+              stdout = out.stdout
+            }
+            if (out && out.stderr) {
+              stderr = out.stderr
+            }
           } catch(err) {
             console.error("error with exec", err.stack);
             axios.post(config.slackAlertEndpoint, slackNotifyHookError(req.body.sender, err, stderr));

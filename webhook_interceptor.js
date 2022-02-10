@@ -24,7 +24,7 @@ const proxy = httpProxy.createProxyServer({});
 const proxyApp = express();
 proxyApp.use(bodyParser.json({ limit: "50mb" }));
 
-async function queueBuild(commitSha, branchSpecificerOverride, sender) {
+async function queueBuild(commitSha, branchSpecificerOverride, payload) {
     console.log('queue build for sha', commitSha)
     return new Promise((resolve, reject)=>{
         jenkins.job.build({
@@ -34,7 +34,7 @@ async function queueBuild(commitSha, branchSpecificerOverride, sender) {
             }
         }, function(err, jenkinsItemNumber) {
             if (err) return reject(err);
-            q.add({ jenkinsItemNumber, commitSha, sender });
+            q.add({ jenkinsItemNumber, commitSha, payload });
             resolve();
         });
     });
@@ -64,12 +64,12 @@ proxyApp.use(async function(req, res){
     }
 
     if (githubEvent == "pull_request" && ( req.body.action == "synchronize" || req.body.action == "opened" )) {
-        await queueBuild(req.body.pull_request.head.sha, null, req.body.sender);
+        await queueBuild(req.body.pull_request.head.sha, null, req.body);
         return res.status(201).end("thanks for the PR, i will build it");
     } else if (githubEvent == "push" && config.refHooks && config.refHooks[req.body.ref]) {
         let hookDefinitions = config.refHooks[req.body.ref];
-        if (hookDefinitions.branch) {
-          await queueBuild(req.body.head_commit.id, branch, req.body.sender);
+        if (hookDefinitions.buildBranch) {
+          await queueBuild(req.body.head_commit.id, hookDefinitions.buildBranch, req.body);
         }
         if (hookDefinitions.exec) {
           console.log("Executing hook...");
@@ -85,7 +85,7 @@ proxyApp.use(async function(req, res){
             }
           } catch(err) {
             console.error("error with exec", err.stack);
-            axios.post(config.slackAlertEndpoint, slackNotifyHookError(req.body.sender, err, stdout, stderr));
+            axios.post(config.slackAlertEndpoint, slackNotifyHookError(req.body, err, stdout, stderr));
           }
         }
         return res.status(201).end("thanks for the push. hooks have executed.");
@@ -95,7 +95,7 @@ proxyApp.use(async function(req, res){
             repo: config.repoName,
             pull_number: req.body.issue.number
         })
-        await queueBuild(pull.data.head.sha, null, req.body.sender);
+        await queueBuild(pull.data.head.sha, null, req.body);
         return res.status(201).end("thanks for the issue comment, i will test it");
     } else {
         console.log("ignoring irrelevant webook delivery", req.headers['x-github-delivery']);
@@ -256,7 +256,16 @@ http.createServer(proxyApp).listen(config.listenPort, '0.0.0.0', () => {
 	console.log('Proxy server listening on '+config.listenPort);
 });
 
-function slackNotify(status, { jenkinsBuildUrl, sender: {login, avatar_url} }, color){
+function slackNotify(status, { jenkinsBuildUrl, payload}, color){
+
+  let { sender: {login, avatar_url} } = payload;
+  let content = ""
+  if (payload.pull_request) {
+    content = `Pull Request #${payload.pull_request.number}: ${payload.pull_request.title}`
+  } else if (payload.ref && payload.head_commit) {
+    content = `Branch ${payload.ref.split('/').pop()} Head Commit: ${payload.head_commit.message}`
+  }
+
     return { "attachments": [
             {
                 "mrkdwn_in": ["text"],
@@ -265,7 +274,7 @@ function slackNotify(status, { jenkinsBuildUrl, sender: {login, avatar_url} }, c
                 "author_icon": avatar_url,
                 "title": `[Jenkins] Build ${status}`,
                 "title_link": jenkinsBuildUrl,
-                "text": `${githubNameToSlackName(login)} build ${status}`,
+                "text": `${githubNameToSlackName(login)} build ${status} for ${content}`,
                 "footer": "jenkins",
                 "footer_icon": "https://www.jenkins.io/images/logos/cowboy/cowboy.png"
             }
@@ -273,7 +282,7 @@ function slackNotify(status, { jenkinsBuildUrl, sender: {login, avatar_url} }, c
     }
 }
 
-function slackNotifyHookError({login, avatar_url}, err, stdout, stderr){
+function slackNotifyHookError({ sender: {login, avatar_url}}, err, stdout, stderr){
   let attachments = [
     {
       "mrkdwn_in": ["text"],

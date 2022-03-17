@@ -256,11 +256,22 @@ http.createServer(proxyApp).listen(config.listenPort, '0.0.0.0', () => {
 	console.log('Proxy server listening on '+config.listenPort);
 });
 
-function slackNotify(status, { jenkinsBuildUrl, payload}, color){
+function getSenderIfAny(payload) {
+  let login = "";
+  let avatar_url = "";
+  if (payload && payload.sender) {
+    login = payload.sender.login;
+    avatar_url = payload.sender.avatar_url;
+  }
+  return { login, avatar_url }
+}
 
-  let { sender: {login, avatar_url} } = payload;
+function slackNotify(status, { jenkinsBuildUrl, payload}, color){
+  let { login, avatar_url } = getSenderIfAny(payload);
   let content = ""
-  if (payload.pull_request) {
+  if (!payload) {
+    content = `Manual job.`
+  } else if (payload.pull_request) {
     content = `Pull Request #${payload.pull_request.number}: ${payload.pull_request.title}`
   } else if (payload.ref && payload.head_commit) {
     content = `Branch ${payload.ref.split('/').pop()} Head Commit: ${payload.head_commit.message}`
@@ -282,7 +293,8 @@ function slackNotify(status, { jenkinsBuildUrl, payload}, color){
     }
 }
 
-function slackNotifyHookError({ sender: {login, avatar_url}}, err, stdout, stderr){
+function slackNotifyHookError(payload, err, stdout, stderr){
+  let { login, avatar_url } = getSenderIfAny(payload);
   let attachments = [
     {
       "mrkdwn_in": ["text"],

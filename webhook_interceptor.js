@@ -155,7 +155,7 @@ q.on('next',task => {
                         sha: task.job.commitSha,
                         state: 'pending',
                         context: task.job.jenkinsProjectName,
-                        description: `Job ${task.job.jenkinsProjectName} is waiting in the queue`,
+                        description: `queued`,
                     }).then(()=>{
                         console.log("marked job as blocked");
                         return reschedule(task, { reportedBlockedState: true });
@@ -192,7 +192,7 @@ q.on('next',task => {
                 sha: task.job.commitSha,
                 state: 'failure',
                 context: task.job.jenkinsProjectName,
-                description: `Job ${task.job.jenkinsProjectName} has failed`,
+                description: `failed`,
                 target_url: task.job.jenkinsBuildUrl
             }).then(()=>{
                 console.log("marked job as failure");
@@ -212,7 +212,7 @@ q.on('next',task => {
                 sha: task.job.commitSha,
                 state: 'success',
                 context: task.job.jenkinsProjectName,
-                description: `Job ${task.job.jenkinsProjectName} succeeded`,
+                description: `succeeded`,
                 target_url: task.job.jenkinsBuildUrl
             }).then(()=>{
                 console.log("marked job as success");
@@ -232,7 +232,7 @@ q.on('next',task => {
                 sha: task.job.commitSha,
                 state: 'pending',
                 context: task.job.jenkinsProjectName,
-                description: `Job ${task.job.jenkinsProjectName} is pending`,
+                description: `pending`,
                 target_url: task.job.jenkinsBuildUrl
             }).then(()=>{
                 console.log("marked job as pending");

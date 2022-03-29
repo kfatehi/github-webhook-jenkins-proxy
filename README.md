@@ -42,6 +42,16 @@ then run it
 
 `node webhook_interceptor.js`
 
+## Multi-project configuration
+
+You may want to invoke multiple projects at once.
+
+```
+    "jenkinsProjects": ["myproject-rspec", "myproject-e2e"],
+```
+
+The results of these will be collected and added as checks to the pull request under test.
+
 ## periodic builds
 
 There is an endpoint that you can use in a loop like this to hammer your jenkins with builds using a commit hash:

@@ -154,6 +154,7 @@ q.on('next',task => {
                         repo: config.repoName,
                         sha: task.job.commitSha,
                         state: 'pending',
+                        context: task.job.jenkinsProjectName,
                         description: `Job ${task.job.jenkinsProjectName} is waiting in the queue`,
                     }).then(()=>{
                         console.log("marked job as blocked");
@@ -190,6 +191,7 @@ q.on('next',task => {
                 repo: config.repoName,
                 sha: task.job.commitSha,
                 state: 'failure',
+                context: task.job.jenkinsProjectName,
                 description: `Job ${task.job.jenkinsProjectName} has failed`,
                 target_url: task.job.jenkinsBuildUrl
             }).then(()=>{
@@ -209,6 +211,7 @@ q.on('next',task => {
                 repo: config.repoName,
                 sha: task.job.commitSha,
                 state: 'success',
+                context: task.job.jenkinsProjectName,
                 description: `Job ${task.job.jenkinsProjectName} succeeded`,
                 target_url: task.job.jenkinsBuildUrl
             }).then(()=>{
@@ -228,6 +231,7 @@ q.on('next',task => {
                 repo: config.repoName,
                 sha: task.job.commitSha,
                 state: 'pending',
+                context: task.job.jenkinsProjectName,
                 description: `Job ${task.job.jenkinsProjectName} is pending`,
                 target_url: task.job.jenkinsBuildUrl
             }).then(()=>{

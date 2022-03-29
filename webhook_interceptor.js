@@ -24,20 +24,26 @@ const proxy = httpProxy.createProxyServer({});
 const proxyApp = express();
 proxyApp.use(bodyParser.json({ limit: "50mb" }));
 
+
+const jenkinsProjects = config.jenkinsProjects || [config.jenkinsProject]
+
 async function queueBuild(commitSha, branchSpecificerOverride, payload) {
     console.log('queue build for sha', commitSha)
-    return new Promise((resolve, reject)=>{
-        jenkins.job.build({
-            name: config.jenkinsProject,
-            parameters: {
-                BRANCH_SPECIFIER: branchSpecificerOverride || commitSha
-            }
-        }, function(err, jenkinsItemNumber) {
-            if (err) return reject(err);
-            q.add({ jenkinsItemNumber, commitSha, payload });
-            resolve();
-        });
-    });
+    for (let name of jenkinsProjects) {
+        console.log('telling jenkins to build', name)
+        await (new Promise((resolve, reject)=>{
+            jenkins.job.build({
+                name,
+                parameters: {
+                    BRANCH_SPECIFIER: branchSpecificerOverride || commitSha
+                }
+            }, function(err, jenkinsItemNumber) {
+                if (err) return reject(err);
+                q.add({ jenkinsProjectName: name, jenkinsItemNumber, commitSha, payload });
+                resolve();
+            });
+        }))
+    }
 }
 
 // This route is useful for submitting a build every so often...
@@ -85,7 +91,8 @@ proxyApp.use(async function(req, res){
             }
           } catch(err) {
             console.error("error with exec", err.stack);
-            axios.post(config.slackAlertEndpoint, slackNotifyHookError(req.body, err, stdout, stderr));
+              if (config.slackAlertEndpoint)
+                axios.post(config.slackAlertEndpoint, slackNotifyHookError(req.body, err, stdout, stderr));
           }
         }
         return res.status(201).end("thanks for the push. hooks have executed.");
@@ -147,7 +154,7 @@ q.on('next',task => {
                         repo: config.repoName,
                         sha: task.job.commitSha,
                         state: 'pending',
-                        description: "Build is waiting in the queue",
+                        description: `Job ${task.job.jenkinsProjectName} is waiting in the queue`,
                     }).then(()=>{
                         console.log("marked job as blocked");
                         return reschedule(task, { reportedBlockedState: true });
@@ -169,7 +176,7 @@ q.on('next',task => {
         })
     }
     // slack api for attachment: https://api.slack.com/reference/messaging/attachments
-    jenkins.build.get('bpd-web', task.job.jenkinsBuildId, function(err, data) {
+    jenkins.build.get(task.job.jenkinsProjectName, task.job.jenkinsBuildId, function(err, data) {
         if (err) {
           console.error(err.stack)
           q.done();
@@ -183,10 +190,11 @@ q.on('next',task => {
                 repo: config.repoName,
                 sha: task.job.commitSha,
                 state: 'failure',
-                description: "Build has failed",
+                description: `Job ${task.job.jenkinsProjectName} has failed`,
                 target_url: task.job.jenkinsBuildUrl
             }).then(()=>{
                 console.log("marked job as failure");
+              if (config.slackAlertEndpoint)
                 axios.post(config.slackAlertEndpoint, slackNotify(
                     "Failed", task.job, "#ff0000"
                 ));
@@ -201,10 +209,11 @@ q.on('next',task => {
                 repo: config.repoName,
                 sha: task.job.commitSha,
                 state: 'success',
-                description: "Build succeeded",
+                description: `Job ${task.job.jenkinsProjectName} succeeded`,
                 target_url: task.job.jenkinsBuildUrl
             }).then(()=>{
                 console.log("marked job as success");
+              if (config.slackAlertEndpoint)
                 axios.post(config.slackAlertEndpoint, slackNotify(
                     "Succeeded", task.job, "#36a64f"
                 ));
@@ -219,10 +228,11 @@ q.on('next',task => {
                 repo: config.repoName,
                 sha: task.job.commitSha,
                 state: 'pending',
-                description: "Build is pending",
+                description: `Job ${task.job.jenkinsProjectName} is pending`,
                 target_url: task.job.jenkinsBuildUrl
             }).then(()=>{
                 console.log("marked job as pending");
+              if (config.slackAlertEndpoint)
                 axios.post(config.slackAlertEndpoint, slackNotify(
                     "Pending", task.job, ""
                 ));

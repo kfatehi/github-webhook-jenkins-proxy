@@ -280,7 +280,7 @@ function getSenderIfAny(payload) {
   return { login, avatar_url }
 }
 
-function slackNotify(status, { jenkinsBuildUrl, payload}, color){
+function slackNotify(status, { jenkinsProjectName, jenkinsBuildUrl, payload}, color){
   let { login, avatar_url } = getSenderIfAny(payload);
   let content = ""
   if (!payload) {
@@ -297,9 +297,9 @@ function slackNotify(status, { jenkinsBuildUrl, payload}, color){
                 "color": color,
                 "author_name": login,
                 "author_icon": avatar_url,
-                "title": `[Jenkins] Build ${status}`,
+                "title": `[Jenkins] ${jenkinsProjectName} ${status}`,
                 "title_link": jenkinsBuildUrl,
-                "text": `${githubNameToSlackName(login)} build ${status} for ${content}`,
+                "text": `${githubNameToSlackName(login)} ${jenkinsProjectName} ${status} for ${content}`,
                 "footer": "jenkins",
                 "footer_icon": "https://www.jenkins.io/images/logos/cowboy/cowboy.png"
             }

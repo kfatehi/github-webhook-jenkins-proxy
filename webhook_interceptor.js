@@ -30,15 +30,23 @@ const jenkinsProjects = config.jenkinsProjects || [config.jenkinsProject]
 async function queueBuild(commitSha, branchSpecificerOverride, payload) {
     console.log('queue build for sha', commitSha)
     for (let name of jenkinsProjects) {
-        console.log('telling jenkins to build', name)
+        let parameters = {
+          BRANCH_SPECIFIER: branchSpecificerOverride || commitSha
+        }
+        console.log('telling jenkins to build', name, parameters)
         await (new Promise((resolve, reject)=>{
             jenkins.job.build({
                 name,
-                parameters: {
-                    BRANCH_SPECIFIER: branchSpecificerOverride || commitSha
-                }
+                parameters
             }, function(err, jenkinsItemNumber) {
-                if (err) return reject(err);
+                if (err) {
+                  if (err.statusCode === 303) {
+                    console.log("jenkins is already planning to work on that");
+                    resolve();
+                  } else {
+                    return reject(err);
+                  }
+                }
                 q.add({ jenkinsProjectName: name, jenkinsItemNumber, commitSha, payload });
                 resolve();
             });

@@ -297,6 +297,8 @@ function slackNotify(status, { jenkinsProjectName, jenkinsBuildUrl, payload}, co
     content = `Pull Request #${payload.pull_request.number}: ${payload.pull_request.title}`
   } else if (payload.ref && payload.head_commit) {
     content = `Branch ${payload.ref.split('/').pop()} Head Commit: ${payload.head_commit.message}`
+  } else if (payload.issue) { // Issue comment "jenkins test this"
+    content = `PR #${payload.issue.number}: ${payload.issue.title}`
   }
 
     return { "attachments": [

@@ -292,13 +292,15 @@ function slackNotify(status, { jenkinsProjectName, jenkinsBuildUrl, payload}, co
   let { login, avatar_url } = getSenderIfAny(payload);
   let content = ""
   if (!payload) {
-    content = `Manual job.`
+    content = `job invoked manually.`
   } else if (payload.pull_request) {
-    content = `Pull Request #${payload.pull_request.number}: ${payload.pull_request.title}`
+    content = `job invoked by commit to <${payload.pull_request.html_url}|PR #${payload.pull_request.number}: ${payload.pull_request.title}>`
   } else if (payload.ref && payload.head_commit) {
-    content = `Branch ${payload.ref.split('/').pop()} Head Commit: ${payload.head_commit.message}`
+    let branch = payload.ref.split('/').pop()
+    let branch_url = `https://github.com/${config.repoOwner}/${config.repoName}/tree/${branch}`
+    content = `job invoked by commit <${payload.head_commit.url}|${payload.head_commit.message}> to monitored branch <${branch_url}|${branch}>`
   } else if (payload.issue) { // Issue comment "jenkins test this"
-    content = `PR #${payload.issue.number}: ${payload.issue.title}`
+    content = `job invoked by force on <${payload.issue.html_url}|PR #${payload.issue.number}: ${payload.issue.title}>`
   }
 
     return { "attachments": [

@@ -311,7 +311,7 @@ function slackNotify(status, { jenkinsProjectName, jenkinsBuildUrl, payload}, co
   } else if (payload.ref && payload.head_commit) {
     let branch = payload.ref.split('/').pop()
     let branch_url = `https://github.com/${config.repoOwner}/${config.repoName}/tree/${branch}`
-    content = `job invoked by commit <${payload.head_commit.url}|${payload.head_commit.message}> to monitored branch <${branch_url}|${branch}>`
+    content = `job invoked by <${payload.head_commit.url}|commit> in monitored branch <${branch_url}|${branch}>: ${payload.head_commit.message}`
   } else if (payload.issue) { // Issue comment "jenkins test this"
     content = `job invoked by force on <${payload.issue.html_url}|PR #${payload.issue.number}: ${payload.issue.title}>`
   }

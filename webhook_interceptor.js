@@ -27,30 +27,34 @@ proxyApp.use(bodyParser.json({ limit: "50mb" }));
 
 const jenkinsProjects = config.jenkinsProjects || [config.jenkinsProject]
 
+async function queueBuildForProject(name, commitSha, branchSpecificerOverride, payload) {
+  let parameters = {
+    BRANCH_SPECIFIER: branchSpecificerOverride || commitSha
+  }
+  console.log('telling jenkins to build', name, parameters)
+  await (new Promise((resolve, reject)=>{
+    jenkins.job.build({
+      name,
+      parameters
+    }, function(err, jenkinsItemNumber) {
+      if (err) {
+        if (err.statusCode === 303) {
+          console.log("jenkins is already planning to work on that");
+          resolve();
+        } else {
+          return reject(err);
+        }
+      }
+      q.add({ jenkinsProjectName: name, jenkinsItemNumber, commitSha, payload });
+      resolve();
+    });
+  }))
+}
+
 async function queueBuild(commitSha, branchSpecificerOverride, payload) {
     console.log('queue build for sha', commitSha)
     for (let name of jenkinsProjects) {
-        let parameters = {
-          BRANCH_SPECIFIER: branchSpecificerOverride || commitSha
-        }
-        console.log('telling jenkins to build', name, parameters)
-        await (new Promise((resolve, reject)=>{
-            jenkins.job.build({
-                name,
-                parameters
-            }, function(err, jenkinsItemNumber) {
-                if (err) {
-                  if (err.statusCode === 303) {
-                    console.log("jenkins is already planning to work on that");
-                    resolve();
-                  } else {
-                    return reject(err);
-                  }
-                }
-                q.add({ jenkinsProjectName: name, jenkinsItemNumber, commitSha, payload });
-                resolve();
-            });
-        }))
+      await queueBuildForProject(name, commitSha, branchSpecificerOverride, payload);
     }
 }
 
@@ -60,6 +64,15 @@ async function queueBuild(commitSha, branchSpecificerOverride, payload) {
 proxyApp.get('/build/:commit', async (req, res, next)=>{
     try {
         await queueBuild(req.params.commit)
+        res.send("queued\n")
+    } catch(err) {
+        next(err);
+    }
+})
+
+proxyApp.get('/build/:commit/:project', async (req, res, next)=>{
+    try {
+        await queueBuildForProject(req.params.project, req.params.commit)
         res.send("queued\n")
     } catch(err) {
         next(err);

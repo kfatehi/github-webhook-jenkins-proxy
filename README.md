@@ -93,7 +93,7 @@ Hooks can be used to perform additional behavior depending on the ref on a push 
 
 ## API
 
-There is an /build/:commit endpoint that you can use.
+* GET /build/:commit will invoke all jenkins projects defined for your repo
 
 For example, to queue a build periodically, you can do something like this:
 
@@ -102,3 +102,5 @@ while true; curl localhost:8080/build/3e5c62be177a2ca1489f383ee258031ee458c3fa; 
 ```
 
 This also works in your browser to quickly queue up some specific commit hash.
+
+* GET /build/:commit/:project will invoke only that specified jenkins :project for your repo

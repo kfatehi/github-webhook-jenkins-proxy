@@ -1,31 +1,40 @@
 # github-webhook-jenkins-proxy
 
 The Jenkins Plugin called [ghprb-plugin](https://github.com/jenkinsci/ghprb-plugin) was failing to build dangly PRs (branch of a branch).
+
 It was difficult to work on so instead I created this project to intercept the webhooks and create the jobs using Jenkins API from Node.js.
-The end-goal is to publish status checks, which this project does as well. It supports one or more Jenkins jobs (misnomered as "project" in our config below) but only a single webhook input at this time. These jobs results are sent to the Github statuses API at which point they coalesce into a final pull-request/commit status of pass or failure.
+
+The end-goal is to publish status checks, which this project does as well.
+
+You configure one or more profiles in the config.json, each of which can launch one or more Jenkins jobs for a given repository's incoming github webhook.
+
+The jobs results are sent to the Github statuses API at which point they coalesce into a final pull-request/commit status of pass or failure.
 
 ## Usage
 
-Create config.json file (see below sections for more customization information).
+Create config.json file (see below sections for more customization information) with at least one repository:
 
 ```json
 {
+  "listenPort": 8080,
+  "jenkinsPort": 8081,
+  "profiles": [
     "githubAuth": "personal access token with full 'repo' scope",
     "jenkinsAuth": "youruser:yourapikey",
     "jenkinsProject": "name of jenkins job for incoming webhooks to queue",
     "repoOwner": "org name",
     "repoName": "repo name",
     "triggerPhrase": "a phrase to check for in pr comments to trigger a build",
-    "listenPort": 8080,
-    "jenkinsPort": 8081
+  ]
 }
 ```
 
-Create a directory for the database
+### Shared Keys
 
-```
-mkdir db
-```
+Config keys that are common among the profiles can be placed in the global scope, for example, you can put the repoOwner once in the global scope and omit defining it in the profiles
+
+
+## Install
 
 Install npm packages:
 
@@ -43,7 +52,9 @@ Configure your github project's webhook setting:
 * Content type: application/json
 * Select individual events: Issue comments, Pushes, Pull requests
 
-## Multi-project configuration
+### Multi-project configuration
+
+Scope: profile
 
 You may want to invoke multiple projects at once.
 
@@ -53,7 +64,9 @@ You may want to invoke multiple projects at once.
 
 The results of these will be collected and added as checks to the pull request under test.
 
-## Slack
+### Slack
+
+Scope: profile
 
 You can provide this: 
 
@@ -62,6 +75,8 @@ You can provide this:
 ```
 
 ### Github->Slack User Mentions
+
+Scope: global
 
 You can configure slack user resolution and interpolation by providing a map like so:
 
@@ -73,7 +88,9 @@ You can configure slack user resolution and interpolation by providing a map lik
 
 You can get your slack "ID" from the users' slack profiles.
 
-## Hooks
+### Hooks
+
+Scope: profile
 
 Hooks can be used to perform additional behavior depending on the ref on a push event. For example:
 
@@ -90,6 +107,8 @@ Hooks can be used to perform additional behavior depending on the ref on a push 
     }
   }
 ```
+
+This is useful if you want pushes to "main" or "master" to be built. They are not built by default. If this is all you want, defining the "buildBranch" key to match the "refs/heads/[branch]" will suffice. Use exec for more fancy behavior. Failures are reported to slack if endpoint is defined.
 
 ## API
 

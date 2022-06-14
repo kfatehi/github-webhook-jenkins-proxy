@@ -7,6 +7,7 @@ const config = require('./config.json')
 const setupProfile = require('./profile');
 const hooks = require('./hooks');
 const axios = require('axios')
+const useManualBuildRequestMiddleware = require('./manual-build-middleware');
 
 const q = new Queue('db.sqlite', 1);
 
@@ -43,39 +44,17 @@ function getPi(repoOwner, repoName) {
   return getPiByFullName(repoOwner+'/'+repoName);
 }
 
-q.on('next',task => {
-  const { repoOwner, repoName } = task.job.config;
-  let pi = getPi(repoOwner, repoName);
-  pi.onNext(task);
-});
+const manualBuildRequestMiddleware = useManualBuildRequestMiddleware({ getPi, getPiByFullName })
 
-q.on('stop',() => {
-  console.log('Stopping queue') ;
-});
+proxyApp.post('/build-all', manualBuildRequestMiddleware, async (req, res, next)=>{
+  await req.pi.queueBuild(req.body.commit)
+  res.send("queued\n")
+})
 
-q.on('close',() => {
-  console.log('Closing SQLite DB') ;
-});
-
-q.on('open',() => {
-  console.log('Opening SQLite DB') ;
-  console.log('Queue contains '+q.getLength()+' job/s');
-}) ;
-
-q.on('add',task => {
-  console.log('Adding task ('+q.getLength()+' total) '+JSON.stringify(task));
-}) ;
-
-q.on('start',() => {
-  console.log('Started queue') ;
-});
-
-q.open().then(() => {
-  q.start();
-}).catch(err => {
-  console.log('Error occurred:') ;
-  console.log(err.stack);
-});
+proxyApp.post('/build-one', manualBuildRequestMiddleware, async (req, res, next)=>{
+  await req.pi.queueBuildForProject(req.body.project, req.body.commit)
+  res.send("queued\n")
+})
 
 proxyApp.use(async function(req, res){
   let githubEvent = req.headers['x-github-event'];
@@ -137,47 +116,41 @@ proxyApp.use(async function(req, res){
   }
 });
 
-function manualBuildRequestMiddleware(req, res, next) {
-  const pi = getPi(req.body.repoOwner,req.body.repoName) || getPiByFullName[req.body.repo];
-  if (!pi) {
-    res.send("must provide a matching repoOwner and repoName combination")
-    return;
-  }
-  if (req.body.commit.length !== 40) {
-    res.send("commit should be 40 characters\n")
+q.on('next',task => {
+  const { repoOwner, repoName } = task.job.config;
+  let pi = getPi(repoOwner, repoName);
+  pi.onNext(task);
+});
 
-    // If trying to build a branch, you maybe can use this to get the SHA1
-    // either way you need that because the checks API does not accept a branch name
-    // when we are ready to report the result.
-    //
-    // https://docs.github.com/en/rest/commits/commits#list-commits
-    //let commits = await octokit.request('GET /repos/{owner}/{repo}/commits', {
-    //  owner: pi.config.repoOwner,
-    //  repo: pi.config.repoName,
-    //  sha: 
-    //})
+q.on('stop',() => {
+  console.log('Stopping queue') ;
+});
 
-    return;
-  }
-  try {
-    req.pi = pi;
-    next();
-  } catch(err) {
-    next(err);
-  }
-}
+q.on('close',() => {
+  console.log('Closing SQLite DB') ;
+});
 
-proxyApp.post('/build/:commit', manualBuildRequestMiddleware, async (req, res, next)=>{
-  await req.pi.queueBuild(req.body.commit)
-  res.send("queued\n")
-})
+q.on('open',() => {
+  console.log('Opening SQLite DB') ;
+  console.log('Queue contains '+q.getLength()+' job/s');
+}) ;
 
-proxyApp.post('/build/:commit/:project', manualBuildRequestMiddleware, async (req, res, next)=>{
-  await req.pi.queueBuildForProject(req.body.project, req.body.commit)
-  res.send("queued\n")
-})
+q.on('add',task => {
+  console.log('Adding task ('+q.getLength()+' total) ');//+JSON.stringify(task));
+}) ;
 
+q.on('start',() => {
+  console.log('Started queue') ;
+});
+
+q.open().then(() => {
+  q.start();
+}).catch(err => {
+  console.log('Error occurred:') ;
+  console.log(err.stack);
+});
 
 http.createServer(proxyApp).listen(config.listenPort, '0.0.0.0', () => {
   console.log('Proxy server listening on '+config.listenPort);
 });
+

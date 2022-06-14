@@ -112,14 +112,14 @@ This is useful if you want pushes to "main" or "master" to be built. They are no
 
 ## API
 
-* GET /build/:commit will invoke all jenkins projects defined for your repo
+### /build-all
 
-For example, to queue a build periodically, you can do something like this:
+Build all projects that match the given repository at the given commit
 
-```
-while true; curl localhost:8080/build/3e5c62be177a2ca1489f383ee258031ee458c3fa; do sleep 1400; done;
-```
+`curl -XPOST -H"Content-Type:application/json" -d'{"repo":"my/proj", "commit":"d0d353e1df3e97e234b93c381b4f55d1205e23e5"}' https://jenkins.site/build-all`
 
-This also works in your browser to quickly queue up some specific commit hash.
+### /build-one
 
-* GET /build/:commit/:project will invoke only that specified jenkins :project for your repo
+Build a single project that matches the given repository at the given commit
+
+`curl -XPOST -H"Content-Type:application/json" -d'{"project":"e2e", "repo":"my/proj", "commit":"d0d353e1df3e97e234b93c381b4f55d1205e23e5"}' https://jenkins.site/build-all`

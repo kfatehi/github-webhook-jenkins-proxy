@@ -50,7 +50,7 @@ module.exports = (config, jenkins, q) => {
   }
 
   function onNext(task) {
-    console.log('Process task ('+q.getLength()+' total) '+JSON.stringify(task));
+    console.log('Process task ('+q.getLength()+' total) '); //+JSON.stringify(task));
 
     if (!task.job.jenkinsBuildId) {
       return jenkins.queue.item( task.job.jenkinsItemNumber,  function(err, data) {
@@ -102,7 +102,6 @@ module.exports = (config, jenkins, q) => {
         console.log("Marking as done due to error");
         return;
       }
-      console.log("Got build from jenkins", data);
 
       if (data.result == "FAILURE" || data.result == "ABORTED") {
         return octokit.request('POST /repos/{owner}/{repo}/statuses/{sha}', {
@@ -125,7 +124,7 @@ module.exports = (config, jenkins, q) => {
           return reschedule(task);
         })
       } else if (data.result == "SUCCESS") {
-        console.log("Reporting success for task", task);
+        console.log("Reporting success for task");
         return octokit.request('POST /repos/{owner}/{repo}/statuses/{sha}', {
           owner: config.repoOwner,
           repo: config.repoName,

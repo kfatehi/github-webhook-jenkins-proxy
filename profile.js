@@ -63,7 +63,7 @@ module.exports = (config, jenkins, q) => {
         if (data.executable) {
           return reschedule(task, {
             jenkinsBuildId: data.executable.number,
-            // jenkinsBuildUrl: data.executable.url //  this is fine if you configured jenkins publicly, otherwise you can rewrite it
+            jenkinsBuildUrl: data.executable.url
           }, 5000);
         } else if (data.blocked || data.why && data.why.startsWith("Waiting")) {
           if (!task.job.reportedBlockedState) {

@@ -62,6 +62,10 @@ async function queueBuild(commitSha, branchSpecificerOverride, payload) {
 // e.g.: build @ this commit every 20 mins:
 // while true; curl localhost:8080/build/f7e4795dcbe97a6bf2c36c986184fe7de73af3b0; do sleep 1440; done;
 proxyApp.get('/build/:commit', async (req, res, next)=>{
+  if (req.params.commit.length !== 40) {
+    res.send("commit should be 40 characters\n")
+    return;
+  }
     try {
         await queueBuild(req.params.commit)
         res.send("queued\n")
@@ -71,6 +75,10 @@ proxyApp.get('/build/:commit', async (req, res, next)=>{
 })
 
 proxyApp.get('/build/:commit/:project', async (req, res, next)=>{
+  if (req.params.commit.length !== 40) {
+    res.send("commit should be 40 characters\n")
+    return;
+  }
     try {
         await queueBuildForProject(req.params.project, req.params.commit)
         res.send("queued\n")
@@ -168,7 +176,7 @@ q.on('next',task => {
                     jenkinsBuildId: data.executable.number,
                     jenkinsBuildUrl: data.executable.url.replace('b1to1p1to1d.hopto.org', '10.170.148.199')
                 }, 5000);
-            } else if (data.blocked) {
+            } else if (data.blocked || data.why && data.why.startsWith("Waiting")) {
                 if (!task.job.reportedBlockedState) {
                     octokit.request('POST /repos/{owner}/{repo}/statuses/{sha}', {
                         owner: config.repoOwner,
@@ -205,6 +213,7 @@ q.on('next',task => {
           console.log("Marking as done due to error");
           return;
         }
+      console.log("Got build from jenkins", data);
 
         if (data.result == "FAILURE" || data.result == "ABORTED") {               
             return octokit.request('POST /repos/{owner}/{repo}/statuses/{sha}', {
@@ -227,6 +236,7 @@ q.on('next',task => {
                 return reschedule(task);
             })
         } else if (data.result == "SUCCESS") {
+          console.log("Reporting success for task", task);
             return octokit.request('POST /repos/{owner}/{repo}/statuses/{sha}', {
                 owner: config.repoOwner,
                 repo: config.repoName,

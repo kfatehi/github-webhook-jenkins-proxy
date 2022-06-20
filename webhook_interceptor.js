@@ -46,15 +46,51 @@ function getPi(repoOwner, repoName) {
 
 const manualBuildRequestMiddleware = useManualBuildRequestMiddleware({ getPi, getPiByFullName })
 
-proxyApp.post('/build-all', manualBuildRequestMiddleware, async (req, res, next)=>{
+const commitLengthCheckMiddleware = (req, res, next)=>{
+  if (req.body.commit.length !== 40) {
+    return res.send("commit should be 40 characters\n")
+
+    // If trying to build a branch, you maybe can use this to get the SHA1
+    // either way you need that because the checks API does not accept a branch name
+    // when we are ready to report the result.
+    //
+    // https://docs.github.com/en/rest/commits/commits#list-commits
+    //let commits = await octokit.request('GET /repos/{owner}/{repo}/commits', {
+    //  owner: pi.config.repoOwner,
+    //  repo: pi.config.repoName,
+    //  sha: 
+    //})
+
+  }
+  return next()
+}
+
+proxyApp.post('/build-all', manualBuildRequestMiddleware, commitLengthCheckMiddleware, async (req, res, next)=>{
   await req.pi.queueBuild(req.body.commit)
   res.send("queued\n")
 })
 
-proxyApp.post('/build-one', manualBuildRequestMiddleware, async (req, res, next)=>{
+proxyApp.post('/build-one', manualBuildRequestMiddleware, commitLengthCheckMiddleware, async (req, res, next)=>{
   await req.pi.queueBuildForProject(req.body.project, req.body.commit)
   res.send("queued\n")
 })
+
+proxyApp.post('/retry-one', manualBuildRequestMiddleware, async (req, res, next)=>{
+  jenkins.build.get(req.body.project, req.body.build, async (err, data)=>{
+    if (err) {
+      return next(err)
+    }
+    let paramsAction = data.actions.find(a=>a._class === 'hudson.model.ParametersAction')
+    let commit = paramsAction.parameters.find(a=>a.name="BRANCH_SPECIFIER").value
+    await req.pi.queueBuildForProject(req.body.project, commit)
+    res.send("queued\n")
+  })
+})
+
+proxyApp.get("/retry/:repoOrg/:repoName/:projectName/:buildNumber", (req, res, next)=>{
+  res.render("retry.html.ejs", req.params);
+
+});
 
 proxyApp.use(async function(req, res){
   let githubEvent = req.headers['x-github-event'];

@@ -1,0 +1,31 @@
+<html>
+  <head>
+    <script>
+      async function retry(link) {
+        link.onclick=null;
+        try {
+          link.innerText = "Attempting to send retry request..."
+          const response = await fetch('/retry-one', {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: {
+              repo: '<%= repoOrg %>/<%= repoName %>',
+              project: '<%= projectName %>',
+              build: parseInt(<%= buildNumber %>)
+            }
+          })
+          link.innerText = "Retry requested. You can close this window."
+        } catch(err) {
+          link.innerText = "Retry request failed."
+          link.innerText += err.message
+          console.error(err)
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <a href="#" onclick="javascript:retry(this)">Click to retry <%= repoOrg %>/<%= repoName %> <%= projectName %> <%= buildNumber %></a>
+  </body>
+</html>

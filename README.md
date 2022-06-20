@@ -18,14 +18,14 @@ Create config.json file (see below sections for more customization information) 
 {
   "listenPort": 8080,
   "jenkinsPort": 8081,
-  "profiles": [
+  "profiles": [{
     "githubAuth": "personal access token with full 'repo' scope",
     "jenkinsAuth": "youruser:yourapikey",
     "jenkinsProject": "name of jenkins job for incoming webhooks to queue",
     "repoOwner": "org name",
     "repoName": "repo name",
     "triggerPhrase": "a phrase to check for in pr comments to trigger a build",
-  ]
+  }]
 }
 ```
 
@@ -112,14 +112,54 @@ This is useful if you want pushes to "main" or "master" to be built. They are no
 
 ## API
 
-### /build-all
+### POST /build-all
 
 Build all projects that match the given repository at the given commit
 
 `curl -XPOST -H"Content-Type:application/json" -d'{"repo":"my/proj", "commit":"d0d353e1df3e97e234b93c381b4f55d1205e23e5"}' https://jenkins.site/build-all`
 
-### /build-one
+### POST /build-one
 
 Build a single project that matches the given repository at the given commit
 
-`curl -XPOST -H"Content-Type:application/json" -d'{"project":"e2e", "repo":"my/proj", "commit":"d0d353e1df3e97e234b93c381b4f55d1205e23e5"}' https://jenkins.site/build-all`
+`curl -XPOST -H"Content-Type:application/json" -d'{"project":"e2e", "repo":"my/proj", "commit":"d0d353e1df3e97e234b93c381b4f55d1205e23e5"}' https://jenkins.site/build-one`
+
+
+### POST /retry-one
+
+Retry a single project based on a provided build number
+
+`curl -XPOST -H"Content-Type:application/json" -d'{"repo":"my/proj", "project":"e2e", "build":"552"}' https://jenkins.site/retry-one`
+
+## Pages
+
+### GET /retry/:repoOrg/:repoName/:projectName/:buildNumber
+
+Provides a link to retry the specific build.
+
+#### Github Check Retry Userscript
+
+The following userscript can be used to put a retry button on failed checks.
+
+This will take you to the aforementioned page within the proxy from which a retry of that specific check can be requested.
+
+```
+JENKINS_SITE="https://jenkins.site"
+function check() {
+  document.querySelectorAll('.merge-status-item [title=failed]').forEach(a=>{
+    if (!a.querySelector('a')) {
+      let detailsURL = a.parentElement.querySelector('a.status-actions').href;
+      let detailParts = detailsURL.split('/').filter(b=>b!=='')
+      let [projectName, buildNumber] = detailParts.slice(detailParts.length-2, detailParts.length)
+      let [repoOrg, repoName] = window.location.pathname.split('/').filter(b=>b!=='').slice(0,2)
+      let link = document.createElement("a")
+      link.target = "_blank"
+      link.innerText = "Retry"
+      link.href = `${JENKINS_SITE}/retry/${repoOrg}/${repoName}/${projectName}/${buildNumber}`
+      a.appendChild(link)
+    }
+  })
+}
+
+setInterval(check, 1000)
+```

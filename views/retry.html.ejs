@@ -10,11 +10,11 @@
             headers: {
               "Content-Type": "application/json"
             },
-            body: {
+            body: JSON.stringify({
               repo: '<%= repoOrg %>/<%= repoName %>',
               project: '<%= projectName %>',
               build: parseInt(<%= buildNumber %>)
-            }
+            })
           })
           link.innerText = "Retry requested. You can close this window."
         } catch(err) {

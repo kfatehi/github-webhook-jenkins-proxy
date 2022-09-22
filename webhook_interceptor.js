@@ -144,7 +144,7 @@ proxyApp.use(async function(req, res){
       repo: pi.config.repoName,
       pull_number: req.body.issue.number
     })
-    await queueBuild(pull.data.head.sha, null, req.body);
+    await pi.queueBuild(pull.data.head.sha, null, req.body);
     return res.status(201).end("thanks for the issue comment, i will test it");
   } else {
     console.log("ignoring irrelevant webook delivery", req.headers['x-github-delivery']);

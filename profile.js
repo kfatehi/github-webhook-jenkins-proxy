@@ -10,9 +10,17 @@ module.exports = (config, jenkins, q) => {
   const jenkinsProjects = config.jenkinsProjects || [config.jenkinsProject]
 
   async function queueBuildForProject(name, commitSha, branchSpecificerOverride, payload) {
-    let parameters = {
-      BRANCH_SPECIFIER: branchSpecificerOverride || commitSha
+    let testTarget = branchSpecificerOverride || commitSha;
+    if (testTarget.length != 40) {
+      // resolve the sha from the branch
+      let commits = await pi.octokit.request('GET /repos/{owner}/{repo}/commits/{branch_name}', {
+        owner: pi.config.repoOwner,
+        repo: pi.config.repoName,
+        branch_name: testTarget
+      })
+      testTarget = commits.data.sha
     }
+    let parameters = { BRANCH_SPECIFIER: testTarget }
     console.log('telling jenkins to build', name, parameters)
     await (new Promise((resolve, reject)=>{
       jenkins.job.build({
@@ -67,14 +75,16 @@ module.exports = (config, jenkins, q) => {
           }, 5000);
         } else if (data.blocked || data.why && data.why.startsWith("Waiting")) {
           if (!task.job.reportedBlockedState) {
-            octokit.request('POST /repos/{owner}/{repo}/statuses/{sha}', {
+            let params = {
               owner: config.repoOwner,
               repo: config.repoName,
               sha: task.job.commitSha,
               state: 'pending',
               context: task.job.jenkinsProjectName,
               description: `queued`,
-            }).then(()=>{
+            }
+            console.log("Posting status", params)
+            octokit.request('POST /repos/{owner}/{repo}/statuses/{sha}', params).then(()=>{
               console.log("marked job as blocked");
               return reschedule(task, { reportedBlockedState: true });
             }).catch(err=>{
@@ -124,8 +134,9 @@ module.exports = (config, jenkins, q) => {
           return reschedule(task);
         })
       } else if (data.result == "SUCCESS") {
-        console.log("Reporting success for task");
-        return octokit.request('POST /repos/{owner}/{repo}/statuses/{sha}', {
+        if (task.job.commitSha.length !== 40) {
+        }
+        let params = {
           owner: config.repoOwner,
           repo: config.repoName,
           sha: task.job.commitSha,
@@ -133,7 +144,9 @@ module.exports = (config, jenkins, q) => {
           context: task.job.jenkinsProjectName,
           description: `succeeded`,
           target_url: task.job.jenkinsBuildUrl
-        }).then(()=>{
+        }
+        console.log("Reporting success for task", params);
+        return octokit.request('POST /repos/{owner}/{repo}/statuses/{sha}', params).then(()=>{
           console.log("marked job as success");
           if (config.slackAlertEndpoint)
             axios.post(config.slackAlertEndpoint, slackNotify(
@@ -145,7 +158,7 @@ module.exports = (config, jenkins, q) => {
           return reschedule(task);
         })
       } else if (!task.job.reportedPendingState) {
-        octokit.request('POST /repos/{owner}/{repo}/statuses/{sha}', {
+        let params = {
           owner: config.repoOwner,
           repo: config.repoName,
           sha: task.job.commitSha,
@@ -153,7 +166,9 @@ module.exports = (config, jenkins, q) => {
           context: task.job.jenkinsProjectName,
           description: `pending`,
           target_url: task.job.jenkinsBuildUrl
-        }).then(()=>{
+        }
+        console.log("Posting status", params)
+        octokit.request('POST /repos/{owner}/{repo}/statuses/{sha}', params).then(()=>{
           console.log("marked job as pending");
           if (config.slackAlertEndpoint)
             axios.post(config.slackAlertEndpoint, slackNotify(

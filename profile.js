@@ -13,9 +13,9 @@ module.exports = (config, jenkins, q) => {
     let testTarget = branchSpecificerOverride || commitSha;
     if (testTarget.length != 40) {
       // resolve the sha from the branch
-      let commits = await pi.octokit.request('GET /repos/{owner}/{repo}/commits/{branch_name}', {
-        owner: pi.config.repoOwner,
-        repo: pi.config.repoName,
+      let commits = await octokit.request('GET /repos/{owner}/{repo}/commits/{branch_name}', {
+        owner: config.repoOwner,
+        repo: config.repoName,
         branch_name: testTarget
       })
       testTarget = commits.data.sha

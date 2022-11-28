@@ -92,23 +92,46 @@ You can get your slack "ID" from the users' slack profiles.
 
 Scope: profile
 
-Hooks can be used to perform additional behavior depending on the ref on a push event. For example:
+Hooks can be used to perform additional behavior depending on the ref on a push event.
+
+This is useful if you want pushes to "main" or "master" to be built. They are not built by default because the webhook payload is different from pull requests, so they are detected and handled separately with this hook concept.
+
+#### buildBranch
+
+If you want to run all jenkinsProjects as usual, then defining the "buildBranch" key to match the "refs/heads/[branch]" will suffice:
 
 ```
-  "refHooks": {
-    "refs/heads/foo": {
-      "buildBranch": "foo",
-    },
-    "refs/heads/master": {
-      "buildBranch": false,
-      "exec": {
-        "command": "cd /repo && some crazy merge push automation"
-      }
-    }
+"refHooks": {
+  "refs/heads/master": {
+    "buildBranch": "master",
   }
+}
 ```
 
-This is useful if you want pushes to "main" or "master" to be built. They are not built by default. If this is all you want, defining the "buildBranch" key to match the "refs/heads/[branch]" will suffice. Use exec for more fancy behavior. Failures are reported to slack if endpoint is defined.
+##### extraJenkinsProjects Hook
+
+Combine buildBranch with extraJenkinsProjects to include any extra jenkins projects that are NOT defined in the profile's jenkinsProjects but which should be included for this branch.
+
+```
+"refHooks": {
+  "refs/heads/master": {
+    "buildBranch": "master",
+    "extraJenkinsProjects": ["master-only-project"]
+  }
+}
+```
+
+#### exec
+
+Use exec for custom scripts. Failures are reported to slack if endpoint is defined. Jenkins is bypassed/irrelevant in this case, however the other hooks will still fire and behave as expected if defined.
+
+```
+"refs/heads/master": {
+  "exec": {
+    "command": "cd /repo && some crazy merge push automation"
+  }
+}
+```
 
 ## API
 

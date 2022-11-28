@@ -41,9 +41,10 @@ module.exports = (config, jenkins, q) => {
     }))
   }
 
-  async function queueBuild(commitSha, branchSpecificerOverride, payload) {
+  async function queueBuild(commitSha, branchSpecificerOverride, payload, projectListOperator=null) {
     console.log('queue build for sha', commitSha)
-    for (let name of jenkinsProjects) {
+    let projectList = projectListOperator ? projectListOperator(jenkinsProjects) : jenkinsProjects
+    for (let name of projectList) {
       await queueBuildForProject(name, commitSha, branchSpecificerOverride, payload);
     }
   }

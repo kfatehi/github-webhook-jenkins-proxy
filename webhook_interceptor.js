@@ -117,7 +117,13 @@ proxyApp.use(async function(req, res){
   } else if (githubEvent == "push" && pi.config.refHooks && pi.config.refHooks[req.body.ref]) {
     let hookDefinitions = pi.config.refHooks[req.body.ref];
     if (hookDefinitions.buildBranch) {
-      await pi.queueBuild(req.body.head_commit.id, hookDefinitions.buildBranch, req.body);
+      await pi.queueBuild(req.body.head_commit.id, hookDefinitions.buildBranch, req.body, (projectList)=>{
+        if (hookDefinitions.extraJenkinsProjects) {
+          return [...projectList, ...hookDefinitions.extraJenkinsProjects]
+        } else {
+          return projectList
+        }
+      });
     }
     if (hookDefinitions.exec) {
       console.log("Executing hook...");

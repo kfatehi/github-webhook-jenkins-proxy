@@ -218,11 +218,9 @@ module.exports = (config, jenkins, q) => {
           "color": color,
           "author_name": login,
           "author_icon": avatar_url,
-          "title": `[Jenkins] ${jenkinsProjectName} ${status}`,
+          "title": `${jenkinsProjectName} ${status}`,
           "title_link": jenkinsBuildUrl,
-          "text": `${githubNameToSlackName(login)} ${jenkinsProjectName} ${status} for ${content}`,
-          "footer": "jenkins",
-          "footer_icon": "https://www.jenkins.io/images/logos/cowboy/cowboy.png"
+          "text": `${githubNameToSlackName(login)} ${jenkinsProjectName} ${status} for ${content}`
         }
       ]
     }

@@ -7,6 +7,9 @@ const config = require('./config.json')
 const setupProfile = require('./profile');
 const hooks = require('./hooks');
 const axios = require('axios')
+const needle = require('needle');
+const cors = require('cors');
+
 const useManualBuildRequestMiddleware = require('./manual-build-middleware');
 
 const q = new Queue('db.sqlite', 1);
@@ -91,6 +94,32 @@ proxyApp.get("/retry/:repoOrg/:repoName/:projectName/:buildNumber", (req, res, n
   res.render("retry.html.ejs", req.params);
 
 });
+
+if (config.artifactProxy) {
+  const artifactProxyCorsOptions = {
+    origin: '*', // or specify allowed origins
+    methods: 'GET', // specify allowed methods
+    allowedHeaders: ['Content-Type'], // specify allowed headers
+  };
+  
+  // Effectively makes all artifacts public via secret key
+  // To use it, you need to define a section in the config.json like this:
+  // "artifactProxy": { "secret": "mysecret" }
+  // and then you can access artifacts by taking the public URL and prefixing it
+  // with artifactProxy and suffixing it with ?secret=mysecret
+  // thus providing a mechanism by which you can share artifacts via public URL
+  proxyApp.get("/artifactProxy/:secret/job/:projectName/:build/artifact/*", cors(artifactProxyCorsOptions), (req, res, next)=>{
+    if (req.params?.secret === config.artifactProxy.secret) {
+      let { auth, hostname, port, protocol } = jenkins._opts.baseUrl
+      let regex = new RegExp(`^/artifactProxy/${req.params.secret}`)
+      let url = `${protocol}//${hostname}:${port}${req.path.replace(regex,'')}`
+      let [username, password] = auth.split(":")
+      needle.get(url, {username, password}).pipe(res)
+    } else {
+      res.status(403).end("403 Forbidden")
+    }
+  });
+}
 
 proxyApp.use(async function(req, res){
   let githubEvent = req.headers['x-github-event'];

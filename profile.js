@@ -28,11 +28,16 @@ module.exports = (config, jenkins, q) => {
         parameters
       }, function(err, jenkinsItemNumber) {
         if (err) {
-          if (err.statusCode === 303) {
-            console.log("jenkins is already planning to work on that");
-            resolve();
-          } else {
-            return reject(err);
+          console.log("jenkins returned status code", err.statusCode)
+          switch (err.statusCode) {
+            case 303: {
+              console.log("jenkins is already planning to work on that");
+              return resolve();
+            }
+            case 409: {
+              console.log("jenkins is not allowing that project right now, sorry");
+              return resolve();
+            }
           }
         }
         q.add({ config, jenkinsProjectName: name, jenkinsItemNumber, commitSha, payload });

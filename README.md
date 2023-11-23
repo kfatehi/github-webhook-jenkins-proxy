@@ -88,6 +88,25 @@ You can configure slack user resolution and interpolation by providing a map lik
 
 You can get your slack "ID" from the users' slack profiles.
 
+### Playwright Trace Linkers
+
+Scope: global
+
+Effectively makes these projects' artifacts (at that path) public via secret key. Be sure to use SSL.
+You can use this in combination with Playwright's trace writing feature which creates a series of folders with zip files in them.
+Enter the parent directory of those folders in the `path` key relative to the workspace.
+
+```
+"playwrightTraceLinkers": [{
+  "project": "my-playwright-project",
+  "path": "my-traces-dir"
+}]
+```
+
+Now browse the artifacts page and enter the folders with the traces in them.
+You will see a link to playwright's trace viewer next to each zip.
+The links that are generated are using a 1-hour TTL secret for the public links to artifacts.
+
 ### Hooks
 
 Scope: profile
